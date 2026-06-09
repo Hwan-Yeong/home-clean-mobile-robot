@@ -23,7 +23,6 @@
 *.dll
 *.so.*
 
-
 # Fortran module files
 *.mod
 *.smod
@@ -67,3 +66,31 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# ============================================
+# ROS2 colcon workspace artifacts
+# ============================================
+install/
+log/
+build/
+
+# ============================================
+# vcs import external source repositories
+# These are managed via deps.repos (vcstool)
+# and should NOT be committed to this repo.
+# ============================================
+src/navigation2/
+src/slam_toolbox/
+src/turtlebot3/
+src/turtlebot3_msgs/
+src/turtlebot3_simulations/
+src/DynamixelSDK/
+src/Fields2Cover/
+src/opennav_coverage/
+
+# Map files (generated at runtime, optionally track them)
+# src/clean_robot_pkg/maps/*.pgm
+# src/clean_robot_pkg/maps/*.yaml
+
+
+.vscode

@@ -1,0 +1,60 @@
+repositories:
+  # ==========================================================
+  # Nav2 (Navigation2) - Core autonomous navigation stack
+  # Branch: humble (ROS2 Humble 릴리즈 브랜치)
+  # ==========================================================
+  src/navigation2:
+    type: git
+    url: https://github.com/ros-planning/navigation2.git
+    version: humble
+
+  # ==========================================================
+  # SLAM Toolbox - Online/Offline SLAM
+  # Branch: humble (ROS2 Humble 릴리즈 브랜치)
+  # ==========================================================
+  src/slam_toolbox:
+    type: git
+    url: https://github.com/SteveMacenski/slam_toolbox.git
+    version: humble
+
+  # ==========================================================
+  # TurtleBot3 - Robot platform packages
+  # Branch: humble-devel (ROBOTIS 공식 Humble 개발 브랜치)
+  # ==========================================================
+  src/turtlebot3:
+    type: git
+    url: https://github.com/ROBOTIS-GIT/turtlebot3.git
+    version: humble
+
+  src/turtlebot3_msgs:
+    type: git
+    url: https://github.com/ROBOTIS-GIT/turtlebot3_msgs.git
+    version: humble
+
+  src/turtlebot3_simulations:
+    type: git
+    url: https://github.com/ROBOTIS-GIT/turtlebot3_simulations.git
+    version: humble
+
+  src/DynamixelSDK:
+    type: git
+    url: https://github.com/ROBOTIS-GIT/DynamixelSDK.git
+    version: humble
+
+  # ==========================================================
+  # Fields2Cover - Complete coverage path planning library
+  # Tag: v1.2.1 (opennav_coverage 호환 버전)
+  # ==========================================================
+  src/Fields2Cover:
+    type: git
+    url: https://github.com/Fields2Cover/Fields2Cover.git
+    version: v1.2.1
+
+  # ==========================================================
+  # OpenNav Coverage - Nav2 Coverage Task Server
+  # Tag: v1.2.1 (Humble & Iron 호환)
+  # ==========================================================
+  src/opennav_coverage:
+    type: git
+    url: https://github.com/open-navigation/opennav_coverage.git
+    version: humble

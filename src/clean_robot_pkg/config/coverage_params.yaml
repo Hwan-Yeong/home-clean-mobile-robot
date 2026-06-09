@@ -1,0 +1,54 @@
+# ==============================================================================
+# Coverage Server Parameters for TurtleBot3 Waffle
+# opennav_coverage (Fields2Cover-based)
+# ==============================================================================
+coverage_server:
+  ros__parameters:
+    use_sim_time: true
+
+    # --------------------------------------------------
+    # Robot dimensions (TurtleBot3 Waffle specs)
+    # --------------------------------------------------
+    robot_width: 0.306        # meters (Waffle width)
+    operation_width: 0.28     # meters (effective cleaning width, slightly less than robot)
+    min_turning_radius: 0.0   # differential drive can turn in place
+
+    # --------------------------------------------------
+    # Coordinate system
+    # --------------------------------------------------
+    # false = Cartesian (meters), true = GPS
+    coordinates_in_gps: false
+
+    # --------------------------------------------------
+    # Headland generation
+    # --------------------------------------------------
+    default_headland_type: 0     # 0=CONSTANT
+    default_headland_width: 0.3  # meters - headland margin from field boundary
+
+    # --------------------------------------------------
+    # Swath generation
+    # --------------------------------------------------
+    default_swath_type: 1           # 1=LENGTH (optimize swath by length)
+    default_swath_angle_type: 0     # 0=SET_ANGLE
+    default_swath_angle: 0.0        # radians (0 = horizontal sweeps)
+    default_allow_overlap: false
+
+    # --------------------------------------------------
+    # Route generation
+    # --------------------------------------------------
+    default_route_type: 2           # 2=SNAKE (boustrophedon pattern)
+    default_route_spiral_n: 3
+
+    # --------------------------------------------------
+    # Path generation
+    # --------------------------------------------------
+    default_path_type: 1            # 1=DUBINS_CURVES
+    default_path_continuity_type: 0 # 0=CONTINUOUS
+    default_turn_point_distance: 0.3
+
+    # --------------------------------------------------
+    # Processing flags
+    # --------------------------------------------------
+    default_generate_headland: true
+    default_generate_route: true
+    default_generate_path: true
