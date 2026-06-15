@@ -20,35 +20,43 @@ coverage_server:
     coordinates_in_gps: false
 
     # --------------------------------------------------
-    # Headland generation
+    # Headland generation : 작업영역 경계에서 회전을 위해 남겨두는 공간 (경계로부터의 offset 개념)
     # --------------------------------------------------
-    default_headland_type: 0     # 0=CONSTANT
+    default_headland_type: "CONSTANT"
     default_headland_width: 0.3  # meters - headland margin from field boundary
 
     # --------------------------------------------------
-    # Swath generation
+    # Swath generation : Swath = 청소 줄, 이 줄을 어느 방향으로 생성할지 결정
+    #   BRUTE_FORCE (모든 각도에서 swath 생성 후 최적 선택)
+    #   SET_ANGLE (사용자가 지정한 각도로 swath 생성)
     # --------------------------------------------------
-    default_swath_type: 1           # 1=LENGTH (optimize swath by length)
-    default_swath_angle_type: 0     # 0=SET_ANGLE
-    default_swath_angle: 0.0        # radians (0 = horizontal sweeps)
+    default_swath_angle_type: "BRUTE_FORCE"
+    default_swath_type: "NUMBER"            # brute_force 일 때, LENGTH (총 경로 길이 최소), NUMBER (청소 줄 개수 최소), COVERAGE (면적 최대화)
+    default_swath_angle: 0.0                # radians (0 = horizontal sweeps)
     default_allow_overlap: false
 
     # --------------------------------------------------
-    # Route generation
+    # Route generation : 생성된 Swath를 어떤 순서로 청소할지 결정
+    #   BOUSTROPHEDON (소가 밭 가는 방식, 회전 최소, 경로 최단)
+    #   SNAKE (boustrophedon과 유사하지만 회전 최소화에 더 집중)
+    #   SPIRAL (바깥에서 안쪽으로, 나선형, 회전 많음)
     # --------------------------------------------------
-    default_route_type: 2           # 2=SNAKE (boustrophedon pattern)
+    default_route_type: "BOUSTROPHEDON"
     default_route_spiral_n: 3
 
     # --------------------------------------------------
-    # Path generation
+    # Path generation : 줄과 줄을 연결하는 방법을 결정
+    #   DUBIN (최단 경로, 회전 반경 고려, 연속적이지만 회전 많음)
+    #   REEDS_SHEPP (최단 경로, 회전 반경 고려, 연속적이면서 회전 최소, 후진 가능)
+    #   CONTINUOUS (줄과 줄을 직선으로 연결, 회전 많음)
     # --------------------------------------------------
-    default_path_type: 1            # 1=DUBINS_CURVES
-    default_path_continuity_type: 0 # 0=CONTINUOUS
+    default_path_type: "REEDS_SHEPP"
+    default_path_continuity_type: "CONTINUOUS"
     default_turn_point_distance: 0.3
 
     # --------------------------------------------------
     # Processing flags
     # --------------------------------------------------
-    default_generate_headland: true
+    default_generate_headland: false #true
     default_generate_route: true
     default_generate_path: true

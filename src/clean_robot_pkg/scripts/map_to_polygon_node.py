@@ -166,6 +166,17 @@ class MapToPolygonNode(Node):
             p.z = 0.0
             polygon_msg.polygon.points.append(p)
 
+        # Close the polygon: Fields2Cover requires first == last point
+        if len(polygon_msg.polygon.points) > 0:
+            first = polygon_msg.polygon.points[0]
+            last = polygon_msg.polygon.points[-1]
+            if first.x != last.x or first.y != last.y:
+                closing = Point32()
+                closing.x = first.x
+                closing.y = first.y
+                closing.z = first.z
+                polygon_msg.polygon.points.append(closing)
+
         self.latest_polygon = polygon_msg
 
         self.get_logger().info(

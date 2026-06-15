@@ -79,6 +79,7 @@ def generate_launch_description():
         executable='controller_server',
         name='controller_server',
         output='screen',
+        # arguments=['--ros-args', '--log-level', 'debug'],
         parameters=[nav2_params_file, {'use_sim_time': use_sim_time}],
     )
 
@@ -129,7 +130,7 @@ def generate_launch_description():
     # --- Coverage Server (opennav_coverage) ---
     coverage_server_node = Node(
         package='opennav_coverage',
-        executable='coverage_server',
+        executable='opennav_coverage',
         name='coverage_server',
         output='screen',
         parameters=[
