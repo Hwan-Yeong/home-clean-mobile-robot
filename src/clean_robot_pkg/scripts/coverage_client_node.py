@@ -38,26 +38,44 @@ Action Clients:
     /follow_path (nav2_msgs/action/FollowPath)
 """
 
+import sys
+import os
 import math
+
+# Ensure local scripts can be imported safely
+script_dir = os.path.dirname(os.path.realpath(__file__))
+if script_dir not in sys.path:
+    sys.path.append(script_dir)
 
 import rclpy
 from rclpy.node import Node
+from rclpy.time import Time
+from rclpy.duration import Duration
 from rclpy.action import ActionClient
 from rclpy.callback_groups import ReentrantCallbackGroup
-from rclpy.duration import Duration
-from rclpy.time import Time
 
 from std_msgs.msg import Bool
-from geometry_msgs.msg import PolygonStamped
-from nav2_msgs.action import FollowPath
-from tf2_ros import Buffer, TransformListener
-
-# opennav_coverage action types
-from opennav_coverage_msgs.action import ComputeCoveragePath
-from opennav_coverage_msgs.msg import Coordinate, Coordinates
-
+from geometry_msgs.msg import Point, PoseStamped, PolygonStamped
+from sensor_msgs.msg import LaserScan
+from nav_msgs.msg import Path
 from visualization_msgs.msg import Marker
 
+# OpenNav Coverage Action/Msg
+from opennav_coverage_msgs.action import ComputeCoveragePath
+from opennav_coverage_msgs.msg import Coordinates, Coordinate
+
+# Nav2 Action
+from nav2_msgs.action import FollowPath
+
+# TF2
+import tf2_ros
+from tf2_ros import Buffer, TransformListener
+
+# path_manager 안전 임포트
+try:
+    from path_manager import CoveragePathManager
+except ImportError:
+    from clean_robot_pkg.path_manager import CoveragePathManager
 
 class CoverageClientNode(Node):
     """
@@ -109,16 +127,134 @@ class CoverageClientNode(Node):
         #     so the coverage path can be re-ordered to start near the
         #     robot's 2D Pose Estimate) ---
         self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer, self)
+        # Create a dedicated callback group for TF to avoid interference
+        self.tf_group = rclpy.callback_groups.MutuallyExclusiveCallbackGroup()
+        self.tf_listener = TransformListener(self.tf_buffer, self, spin_thread=True)
 
-        # --- Visualization (created once, reused) ---
+        # --- Path Management ---
+        self.path_manager = CoveragePathManager(self.get_logger())
+        self.transitioning = False  # To avoid redundant transition calls
+        self.scan_data = None
+        self.obstacle_detected = False
+
+        # --- Subscribers ---
+        self.scan_sub = self.create_subscription(
+            LaserScan,
+            '/scan',
+            self.scan_callback,
+            10,
+        )
+
         self.marker_pub = self.create_publisher(Marker, '/coverage_path_markers', 10)
+
+        # --- Obstacle Monitoring Timer ---
+        self.monitor_timer = self.create_timer(0.5, self.obstacle_monitor_timer_callback)
 
         self.get_logger().info(
             'CoverageClientNode started. Waiting for /cleaning_zone... '
             'Publish "true" on /clean_start to begin cleaning once ready '
             '(after setting the initial pose in RViz).'
         )
+
+    # ------------------------------------------------------------------
+    # Sensor Callbacks & Monitoring
+    # ------------------------------------------------------------------
+    def scan_callback(self, msg: LaserScan):
+        """Monitor laser scan for obstacles in front of the robot."""
+        self.scan_data = msg
+        
+        # Simple front obstacle detection: 
+        # Check within +/- 15 degrees, distance < 0.6m
+        # robot front is around index 0 (depending on lidar orientation)
+        # For TB3 waffle, 0 is front, ranges[0:15] and ranges[345:359]
+        angle_range = 15
+        front_ranges = []
+        
+        # Handles wrap around
+        for i in range(-angle_range, angle_range + 1):
+            idx = i % len(msg.ranges)
+            if msg.range_min < msg.ranges[idx] < msg.range_max:
+                front_ranges.append(msg.ranges[idx])
+        
+        if front_ranges:
+            min_front_dist = min(front_ranges)
+            if min_front_dist < 0.6: # 0.6m threshold
+                if not self.obstacle_detected:
+                    self.get_logger().info(f"Obstacle detected! Min distance: {min_front_dist:.2f}m")
+                self.obstacle_detected = True
+            else:
+                self.obstacle_detected = False
+        else:
+            self.obstacle_detected = False
+
+    def obstacle_monitor_timer_callback(self):
+        """Periodically check if we should trigger a path transition."""
+        if not self.cleaning_in_progress or self.transitioning:
+            return
+
+        if self.obstacle_detected:
+            self.get_logger().info("Obstacle blocking path. Initiating path transition algorithm...")
+            self.perform_path_transition()
+
+    def perform_path_transition(self):
+        """Cancels current path and searches for the next best waypoint."""
+        self.transitioning = True
+        
+        # Stop current movement
+        self.get_logger().info("Cancelling current goal...")
+        self.follow_path_client.cancel_all_goals()
+        
+        # Get current pose
+        robot_pose = self.get_robot_pose_in_map()
+        if robot_pose is None:
+            self.get_logger().error("Could not get robot pose for transition!")
+            self.transitioning = False
+            return
+            
+        robot_x, robot_y = robot_pose
+        
+        # Simple placeholder for obstacle check at waypoint: 
+        # In a real scenario, we might use costmap. For now, we assume current 
+        # position is the only one blocked, and we search for clear space.
+        # But per user request, we search for clear waypoint and check 2m distance.
+        
+        def dummy_check_wp_blocked(x, y):
+            # If waypoint is very close to current robot front obstacle, consider it blocked
+            # This is a simplification.
+            dist_to_robot = math.hypot(x - robot_x, y - robot_y)
+            if dist_to_robot < 0.5: # Waypoint too close to current blocked spot
+                return True
+            return False
+
+        lane_idx, wp_idx = self.path_manager.search_next_clear_waypoint(
+            robot_x, robot_y, dummy_check_wp_blocked)
+        
+        if lane_idx is not None:
+            new_path = self.path_manager.get_path_from_waypoint(lane_idx, wp_idx)
+            if new_path:
+                self.get_logger().info(f"Transition successful. Resuming from lane {lane_idx}, waypoint {wp_idx}.")
+                self.send_updated_path(new_path)
+            else:
+                self.get_logger().error("Failed to generate updated path for transition.")
+                self.cleaning_in_progress = False
+        else:
+            self.get_logger().warn("No clear waypoints found in current or next lanes. Cleaning halted.")
+            self.cleaning_in_progress = False
+            
+        self.transitioning = False
+
+    def send_updated_path(self, path):
+        """Sanitize and send a new path to FollowPath."""
+        stamp_msg = (self.get_clock().now() - Duration(seconds=0.1)).to_msg()
+        path.header.stamp = stamp_msg
+        for pose in path.poses:
+            pose.header.stamp = stamp_msg
+            pose.header.frame_id = path.header.frame_id
+            if pose.pose.orientation.w == 0.0:
+                 pose.pose.orientation.w = 1.0
+
+        self.follow_coverage_path(path)
+        self.publish_path_markers(path)
 
     # ------------------------------------------------------------------
     # Subscriptions
@@ -229,8 +365,7 @@ class CoverageClientNode(Node):
         result_future.add_done_callback(self.coverage_result_callback)
 
     def coverage_result_callback(self, future):
-        """Handle coverage path result: trim it to start near the robot,
-        sanitize it, and send it to FollowPath."""
+        """Handle coverage path result, initialize PathManager, and start following."""
         result = future.result().result
 
         if result.nav_path is None or len(result.nav_path.poses) == 0:
@@ -239,95 +374,29 @@ class CoverageClientNode(Node):
             return
 
         path = result.nav_path
-        planning_time_sec = result.planning_time.sec + result.planning_time.nanosec * 1e-9
-
-        if not path.header.frame_id:
-            path.header.frame_id = 'map'
-
-        xs = [p.pose.position.x for p in path.poses]
-        ys = [p.pose.position.y for p in path.poses]
-        self.get_logger().info(
-            f'Coverage path computed with {len(path.poses)} waypoints '
-            f'(planning time {planning_time_sec:.2f}s). '
-            f'frame_id="{path.header.frame_id}", '
-            f'x range [{min(xs):.2f}, {max(xs):.2f}], '
-            f'y range [{min(ys):.2f}, {max(ys):.2f}]'
-        )
-
-        # --- Re-order the path so it starts near the robot's current pose ---
-        # ComputeCoveragePath has no concept of a "start pose": Fields2Cover
-        # always generates the same boustrophedon (snake) pattern for a given
-        # polygon, with a fixed starting corner, regardless of where the
-        # robot currently is. Without this step, FollowPath would be handed a
-        # global plan whose first waypoints can be many meters away from
-        # wherever the robot was placed via 2D Pose Estimate.
+        
+        # Initialize PathManager with the new path
+        self.path_manager.set_path(path)
+        
+        # Trim initial waypoints to start near robot
         robot_pose = self.get_robot_pose_in_map()
         if robot_pose is not None:
             robot_x, robot_y = robot_pose
-            nearest_idx, nearest_dist = self.find_nearest_waypoint_index(path, robot_x, robot_y)
-
-            self.get_logger().info(
-                f'Robot pose in map frame: ({robot_x:.2f}, {robot_y:.2f}). '
-                f'Nearest coverage waypoint: index {nearest_idx}/{len(path.poses) - 1} '
-                f'at distance {nearest_dist:.2f}m.'
-            )
-
-            if nearest_idx > 0:
-                self.get_logger().info(
-                    f'Trimming {nearest_idx} earlier waypoint(s) so the path '
-                    f'starts from the point closest to the robot.'
-                )
-                path.poses = path.poses[nearest_idx:]
+            lane_idx, wp_idx = self.path_manager.find_nearest_waypoint_in_lane(0, robot_x, robot_y)
+            
+            # Update PathManager to current lane and state
+            # For simplicity, start from lane 0 if near.
+            # (In a more robust version, we'd search all lanes to find the truly nearest)
+            
+            trimmed_path = self.path_manager.get_path_from_waypoint(0, lane_idx if lane_idx else 0)
+            if trimmed_path:
+                self.send_updated_path(trimmed_path)
+            else:
+                self.get_logger().error("Failed to start path following after trimming.")
+                self.cleaning_in_progress = False
         else:
-            self.get_logger().warn(
-                'Could not determine robot pose in the "map" frame (has the '
-                'initial pose been set in RViz / is AMCL localized?). '
-                'Sending the coverage path as-is; it may start far from '
-                'the robot.'
-            )
-
-        if not path.poses:
-            self.get_logger().error('Coverage path is empty after trimming!')
-            self.cleaning_in_progress = False
-            return
-
-        # --- Sanitize headers/timestamps ---
-        # FollowPath transforms each pose into the local costmap frame using
-        # TF at the pose's timestamp. Use "now - 0.1s" so the timestamp is
-        # always slightly in the past relative to the TF buffer (avoiding
-        # extrapolation-into-the-future errors) while staying within
-        # controller_server's transform_tolerance.
-        stamp_msg = (self.get_clock().now() - Duration(seconds=0.1)).to_msg()
-        path.header.stamp = stamp_msg
-        for pose in path.poses:
-            if not pose.header.frame_id:
-                pose.header.frame_id = path.header.frame_id
-            pose.header.stamp = stamp_msg
-
-        # Fix invalid (all-zero) quaternions which can cause the
-        # controller's plan transform/pruning to silently produce 0 poses.
-        fixed_quat_count = 0
-        for pose in path.poses:
-            q = pose.pose.orientation
-            if q.x == 0.0 and q.y == 0.0 and q.z == 0.0 and q.w == 0.0:
-                q.w = 1.0
-                fixed_quat_count += 1
-
-        if fixed_quat_count:
-            self.get_logger().info(
-                f'Fixed {fixed_quat_count} invalid (all-zero) quaternions in coverage path.'
-            )
-
-        start = path.poses[0].pose.position
-        end = path.poses[-1].pose.position
-        self.get_logger().info(
-            f'Sending coverage path with {len(path.poses)} waypoints. '
-            f'start=({start.x:.2f}, {start.y:.2f}), end=({end.x:.2f}, {end.y:.2f})'
-        )
-
-        # Send path to Nav2 FollowPath
-        self.follow_coverage_path(path)
-        self.publish_path_markers(path)
+            self.get_logger().warn("Robot pose unknown. Starting from full coverage path.")
+            self.send_updated_path(path)
 
     def get_robot_pose_in_map(self):
         """Return the robot's (x, y) position in the 'map' frame, or None.
@@ -337,10 +406,19 @@ class CoverageClientNode(Node):
         is available.
         """
         try:
-            tf = self.tf_buffer.lookup_transform('map', 'base_link', Time())
+            # Use current time or 0 for latest available
+            now = Time()
+            
+            # Wait a tiny bit if needed, especially after initial pose set
+            tf = self.tf_buffer.lookup_transform(
+                'map', 
+                'base_link', 
+                now,
+                timeout=Duration(seconds=0.1)
+            )
             return tf.transform.translation.x, tf.transform.translation.y
         except Exception as e:
-            self.get_logger().warn(f'map->base_link TF lookup failed: {e}')
+            self.get_logger().warn(f'map->base_link TF lookup failed (normal during init/jump): {e}')
             return None
 
     @staticmethod

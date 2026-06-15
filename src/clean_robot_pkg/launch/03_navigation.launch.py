@@ -160,8 +160,8 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'map',
-            default_value=os.path.join(pkg_clean_robot, 'maps', 'house_map.yaml'),
-            description='Full path to the map yaml file',
+            default_value=os.path.join(maps_dir, 'house_map.yaml'),
+            description='Full path to the map yaml file (from src)',
         ),
         DeclareLaunchArgument(
             'params_file',

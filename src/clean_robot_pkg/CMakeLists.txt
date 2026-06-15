@@ -23,6 +23,7 @@ install(DIRECTORY
 install(PROGRAMS
   scripts/map_to_polygon_node.py
   scripts/coverage_client_node.py
+  scripts/path_manager.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

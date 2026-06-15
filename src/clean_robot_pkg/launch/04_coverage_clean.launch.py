@@ -164,18 +164,18 @@ def generate_launch_description():
 
     # --- Coverage Client (auto-start cleaning after delay) ---
     # Delayed start to wait for Nav2 + Coverage server to be ready
-    coverage_client_node = TimerAction(
-        period=15.0,  # Wait 15 seconds for all servers to come up
-        actions=[
-            Node(
-                package='clean_robot_pkg',
-                executable='coverage_client_node.py',
-                name='coverage_client_node',
-                output='screen',
-                parameters=[{'use_sim_time': use_sim_time}],
-            ),
-        ],
-    )
+    # coverage_client_node = TimerAction(
+    #     period=15.0,  # Wait 15 seconds for all servers to come up
+    #     actions=[
+    #         Node(
+    #             package='clean_robot_pkg',
+    #             executable='coverage_client_node.py',
+    #             name='coverage_client_node',
+    #             output='screen',
+    #             parameters=[{'use_sim_time': use_sim_time}],
+    #         ),
+    #     ],
+    # )
 
     # --- RViz2 ---
     rviz_config_file = os.path.join(pkg_clean_robot, 'rviz', 'clean_robot.rviz')
@@ -196,8 +196,8 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'map',
-            default_value=os.path.join(pkg_clean_robot, 'maps', 'house_map.yaml'),
-            description='Full path to the map yaml file',
+            default_value=os.path.join(maps_dir, 'house_map.yaml'),
+            description='Full path to the map yaml file (from src)',
         ),
         # Core
         gazebo_launch,
@@ -213,7 +213,7 @@ def generate_launch_description():
         coverage_server_node,
         lifecycle_manager_coverage,
         map_to_polygon_node,
-        coverage_client_node,
+        # coverage_client_node,
         # Visualization
         rviz_node,
     ])
