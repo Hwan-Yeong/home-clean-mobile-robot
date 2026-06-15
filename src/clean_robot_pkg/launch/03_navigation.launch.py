@@ -31,9 +31,11 @@ def generate_launch_description():
 
     # Launch arguments
     use_sim_time = LaunchConfiguration('use_sim_time', default='true')
+    # Use src directory to ensure map availability
+    maps_dir = '/home/hyjoe/hyjoe_repositories/src/home-clean-mobile-robot/src/clean_robot_pkg/maps'
     map_file = LaunchConfiguration(
         'map',
-        default=os.path.join(pkg_clean_robot, 'maps', 'house_map.yaml'),
+        default=os.path.join(maps_dir, 'house_map.yaml'),
     )
     nav2_params_file = LaunchConfiguration(
         'params_file',

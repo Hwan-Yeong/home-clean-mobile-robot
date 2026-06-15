@@ -5,13 +5,9 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
-        - /TF1
-        - /Map1
-        - /LaserScan1
-        - /RobotModel1
+        - /local plan1
         - /Path1
         - /Marker1
-        - /Marker1/Status1
         - /Marker1/Topic1
       Splitter Ratio: 0.5
     Tree Height: 547
@@ -293,7 +289,7 @@ Visualization Manager:
       Length: 0.30000001192092896
       Line Style: Lines
       Line Width: 0.029999999329447746
-      Name: Coverage Path
+      Name: local plan
       Offset:
         X: 0
         Y: 0
@@ -309,7 +305,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /coverage_path
+        Value: /local_plan
       Value: true
     - Alpha: 1
       Class: rviz_default_plugins/Polygon
@@ -410,7 +406,7 @@ Visualization Manager:
       Enabled: true
       Name: Marker
       Namespaces:
-        {}
+        "": true
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -497,5 +493,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1924
-  X: 1924
-  Y: 775
+  X: 1892
+  Y: 743

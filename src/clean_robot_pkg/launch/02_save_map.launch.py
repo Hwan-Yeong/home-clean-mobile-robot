@@ -20,8 +20,8 @@ from launch.substitutions import LaunchConfiguration
 
 
 def generate_launch_description():
-    pkg_clean_robot = get_package_share_directory('clean_robot_pkg')
-    maps_dir = os.path.join(pkg_clean_robot, 'maps')
+    # Map directory in the source tree to avoid data loss during fresh builds
+    maps_dir = '/home/hyjoe/hyjoe_repositories/src/home-clean-mobile-robot/src/clean_robot_pkg/maps'
 
     map_name = LaunchConfiguration('map_name', default='house_map')
 
