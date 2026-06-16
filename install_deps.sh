@@ -36,7 +36,10 @@ sudo apt install -y --no-install-recommends \
     ros-humble-rviz2 \
     ros-humble-joint-state-publisher \
     ros-humble-robot-state-publisher \
-    ros-humble-xacro
+    ros-humble-xacro \
+    ros-humble-cv-bridge \
+    ros-humble-tf2-geometry-msgs \
+    libopencv-dev
 
 echo "============================================"
 echo " [3/5] Installing vcstool..."

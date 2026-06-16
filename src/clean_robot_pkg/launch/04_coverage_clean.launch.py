@@ -156,26 +156,20 @@ def generate_launch_description():
     # --- Map to Polygon Converter ---
     map_to_polygon_node = Node(
         package='clean_robot_pkg',
-        executable='map_to_polygon_node.py',
+        executable='map_to_polygon',
         name='map_to_polygon_node',
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
     )
 
-    # --- Coverage Client (auto-start cleaning after delay) ---
-    # Delayed start to wait for Nav2 + Coverage server to be ready
-    # coverage_client_node = TimerAction(
-    #     period=15.0,  # Wait 15 seconds for all servers to come up
-    #     actions=[
-    #         Node(
-    #             package='clean_robot_pkg',
-    #             executable='coverage_client_node.py',
-    #             name='coverage_client_node',
-    #             output='screen',
-    #             parameters=[{'use_sim_time': use_sim_time}],
-    #         ),
-    #     ],
-    # )
+    # --- Coverage Client (handles manual /clean_start trigger) ---
+    coverage_client_node = Node(
+        package='clean_robot_pkg',
+        executable='coverage_client',
+        name='coverage_client_node',
+        output='screen',
+        parameters=[{'use_sim_time': use_sim_time}],
+    )
 
     # --- RViz2 ---
     rviz_config_file = os.path.join(pkg_clean_robot, 'rviz', 'clean_robot.rviz')
@@ -213,7 +207,7 @@ def generate_launch_description():
         coverage_server_node,
         lifecycle_manager_coverage,
         map_to_polygon_node,
-        # coverage_client_node,
+        coverage_client_node,
         # Visualization
         rviz_node,
     ])

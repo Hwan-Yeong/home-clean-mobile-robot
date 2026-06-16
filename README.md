@@ -70,7 +70,8 @@ home-clean-mobile-robot/
 │       ├── config/               # 파라미터 설정
 │       ├── launch/               # Launch 파일 (01~04)
 │       ├── maps/                 # 저장된 맵 파일
-│       ├── scripts/              # Python 노드
+│       ├── include/              # C++ 헤더 파일
+│       ├── src/                  # C++ 소스 코드
 │       └── rviz/                 # RViz 설정
 └── docs/
     └── user_guide.md             # 실행 가이드 (한국어)
