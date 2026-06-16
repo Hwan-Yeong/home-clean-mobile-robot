@@ -27,8 +27,10 @@ private:
   void clean_start_callback(const std_msgs::msg::Bool::SharedPtr msg);
   
   void monitor_timer_callback();
+  void logging_timer_callback();
   void perform_path_transition();
   void start_mission();
+  void auto_localize();
 
   std::shared_ptr<RobotFacade> robot_;
   std::shared_ptr<ICleaningStrategy> strategy_;
@@ -37,12 +39,16 @@ private:
   rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr clean_start_sub_;
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
   rclcpp::TimerBase::SharedPtr timer_;
+  rclcpp::TimerBase::SharedPtr logging_timer_;
+  rclcpp::TimerBase::SharedPtr init_timer_;
 
   geometry_msgs::msg::PolygonStamped::SharedPtr latest_polygon_;
   bool cleaning_in_progress_;
   bool transitioning_;
   bool obstacle_detected_;
   bool is_rotating_;
+  bool localized_;
+  int localization_retries_;
   rclcpp::Time last_transition_time_;
 };
 

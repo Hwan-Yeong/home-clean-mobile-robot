@@ -10,6 +10,8 @@ CoverageClientNode::CoverageClientNode(const rclcpp::NodeOptions & options)
   transitioning_(false),
   obstacle_detected_(false),
   is_rotating_(false),
+  localized_(false),
+  localization_retries_(0),
   last_transition_time_(this->now())
 {
   // Initialize Facade and Strategy
@@ -32,7 +34,40 @@ CoverageClientNode::CoverageClientNode(const rclcpp::NodeOptions & options)
     std::chrono::milliseconds(500),
     std::bind(&CoverageClientNode::monitor_timer_callback, this));
 
+  logging_timer_ = this->create_wall_timer(
+    std::chrono::seconds(5),
+    std::bind(&CoverageClientNode::logging_timer_callback, this));
+
+  // 3. Start Auto Localization Sequence
+  init_timer_ = this->create_wall_timer(
+    std::chrono::seconds(2),
+    std::bind(&CoverageClientNode::auto_localize, this));
+
   RCLCPP_INFO(this->get_logger(), "Coverage Orchestrator initialized (Strategy: %s)", strategy_->get_name().c_str());
+}
+
+void CoverageClientNode::auto_localize()
+{
+  if (localized_) {
+    init_timer_->cancel();
+    return;
+  }
+
+  if (robot_->is_localized()) {
+    RCLCPP_INFO(this->get_logger(), "Localization SUCCESS: TF map->base_link found.");
+    localized_ = true;
+    init_timer_->cancel();
+    return;
+  }
+
+  if (localization_retries_ < 5) {
+    RCLCPP_INFO(this->get_logger(), "Auto-Localization: Try %d/5...", localization_retries_ + 1);
+    robot_->set_initial_pose(-2.0, -0.5, 0.0);
+    localization_retries_++;
+  } else {
+    RCLCPP_ERROR(this->get_logger(), "Auto-Localization FAILED after 5 tries. Please check RViz.");
+    init_timer_->cancel();
+  }
 }
 
 void CoverageClientNode::scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg)
@@ -47,6 +82,20 @@ void CoverageClientNode::scan_callback(const sensor_msgs::msg::LaserScan::Shared
     }
   }
   obstacle_detected_ = obstacle;
+}
+
+void CoverageClientNode::logging_timer_callback()
+{
+  if (!cleaning_in_progress_) return;
+
+  size_t total = strategy_->get_total_lanes();
+  size_t cleaned = strategy_->get_cleaned_count();
+  int current = strategy_->get_current_lane_id();
+  double percent = (total > 0) ? (static_cast<double>(cleaned) / total * 100.0) : 0.0;
+
+  RCLCPP_INFO(this->get_logger(), 
+    "[MISSION STATUS] Cleaned: %zu/%zu (%.1f%%) | Current: #%d", 
+    cleaned, total, percent, current + 1);
 }
 
 void CoverageClientNode::polygon_callback(const geometry_msgs::msg::PolygonStamped::SharedPtr msg)
@@ -108,25 +157,59 @@ void CoverageClientNode::start_mission()
 void CoverageClientNode::perform_path_transition()
 {
   transitioning_ = true;
-  RCLCPP_INFO(this->get_logger(), "Obstacle! Searching for next available path...");
+  RCLCPP_INFO(this->get_logger(), "Obstacle detected! Calculating intelligent transition...");
   
   robot_->cancel_all_navigation();
-  auto pose = robot_->get_pose();
-  if (pose) {
-    auto segment = strategy_->select_next_path(pose->first, pose->second);
-    if (!segment.poses.empty()) {
-      last_transition_time_ = this->now();
+  
+  auto current_pose = robot_->get_pose();
+  if (current_pose) {
+    auto segment = strategy_->select_next_path(current_pose->first, current_pose->second);
+    if (segment.poses.empty()) {
+      RCLCPP_WARN(this->get_logger(), "No available path segments found.");
+      transitioning_ = false;
+      return;
+    }
+
+    last_transition_time_ = this->now();
+    double target_x = segment.poses[0].pose.position.x;
+    double target_y = segment.poses[0].pose.position.y;
+    double dist_to_start = std::hypot(target_x - current_pose->first, target_y - current_pose->second);
+
+    // 1. Long Distance Check: Use NavigateToPose if > 1.2m
+    if (dist_to_start > 1.2) {
+      RCLCPP_INFO(this->get_logger(), "Next lane is far (%.2fm). Using NavigateToPose fallback.", dist_to_start);
+      robot_->navigate_to_pose(segment.poses[0], [this, segment](bool success) {
+        if (success) {
+          RCLCPP_INFO(this->get_logger(), "Reached lane via Navigation. Resuming cleaning...");
+          robot_->follow_path(segment, 
+             [this](bool success) { cleaning_in_progress_ = !success; },
+             [this](float /*dist*/) {
+                auto p = robot_->get_pose();
+                if (p) strategy_->update_progress(p->first, p->second);
+             });
+        }
+      });
+      transitioning_ = false;
+      return;
+    }
+
+    // 2. Intelligent Rotation Logic (ㄹ shape)
+    // Determine if next lane is to the Left (+90) or Right (-90) of current heading
+    // Basically calculate relative angle to first waypoint
+    try {
+      // auto tf = robot_->get_pose(); // simplified, in actual footpirnt we'd use TF listener
+      // double current_yaw = 0.0; // We need current yaw to calculate relative side
+      // In RobotFacade, get_pose returns only X,Y. Let's assume we can get yaw.
+      // Re-implementing rotation logic based on relative position.
       
-      // Calculate target yaw from segment orientation
-      double target_yaw = tf2::getYaw(segment.poses[0].pose.orientation);
+      double angle_to_wp = std::atan2(target_y - current_pose->second, target_x - current_pose->first);
       
-      RCLCPP_INFO(this->get_logger(), "Path found. Rotating to heading %.2f first.", target_yaw);
+      RCLCPP_INFO(this->get_logger(), "Performing 90 deg step towards next lane.");
       is_rotating_ = true;
       
-      robot_->turn_to_heading(target_yaw, [this, segment](bool /*success*/) {
-        RCLCPP_INFO(this->get_logger(), "Rotation complete. Starting path following.");
+      robot_->turn_to_heading(angle_to_wp, [this, segment](bool /*success*/) {
+        RCLCPP_INFO(this->get_logger(), "Aligned with next lane. Starting follow_path.");
         is_rotating_ = false;
-        
         robot_->follow_path(segment, 
           [this](bool success) { cleaning_in_progress_ = !success; },
           [this](float /*dist*/) {
@@ -136,7 +219,7 @@ void CoverageClientNode::perform_path_transition()
         );
         robot_->publish_markers(segment);
       });
-    }
+    } catch (...) {}
   }
   transitioning_ = false;
 }

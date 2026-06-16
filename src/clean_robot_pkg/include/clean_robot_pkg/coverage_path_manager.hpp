@@ -29,6 +29,7 @@ public:
   size_t get_current_lane_idx() const { return current_lane_idx_; }
   void set_current_lane_idx(size_t idx) { current_lane_idx_ = idx; }
   size_t get_num_lanes() const { return lanes_.size(); }
+  size_t get_cleaned_lanes_count() const;
 
   std::pair<int, double> find_nearest_waypoint_in_lane(size_t lane_idx, double rx, double ry) const;
   std::pair<int, int> find_nearest_waypoint_global(double rx, double ry) const;

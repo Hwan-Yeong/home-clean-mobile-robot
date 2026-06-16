@@ -18,6 +18,11 @@ public:
   nav_msgs::msg::Path select_next_path(double rx, double ry) override;
   void update_progress(double rx, double ry) override;
   bool is_finished() const override;
+
+  size_t get_total_lanes() const override { return path_manager_->get_num_lanes(); }
+  size_t get_cleaned_count() const override { return path_manager_->get_cleaned_lanes_count(); }
+  int get_current_lane_id() const override { return path_manager_->get_current_lane_idx(); }
+
   std::string get_name() const override { return "ZigZag"; }
 
 private:

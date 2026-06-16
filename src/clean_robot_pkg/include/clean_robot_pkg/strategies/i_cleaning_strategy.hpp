@@ -40,6 +40,10 @@ public:
    */
   virtual bool is_finished() const = 0;
 
+  virtual size_t get_total_lanes() const = 0;
+  virtual size_t get_cleaned_count() const = 0;
+  virtual int get_current_lane_id() const = 0;
+
   virtual std::string get_name() const = 0;
 };
 

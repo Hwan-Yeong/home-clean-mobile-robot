@@ -33,16 +33,27 @@ void CoveragePathManager::mark_lane_status(size_t index, LaneStatus status)
   }
 }
 
+size_t CoveragePathManager::get_cleaned_lanes_count() const
+{
+  size_t count = 0;
+  for (auto s : lane_statuses_) {
+    if (s == LaneStatus::CLEANED) count++;
+  }
+  return count;
+}
+
 void CoveragePathManager::update_progress(double rx, double ry, double threshold)
 {
   if (current_lane_idx_ < lanes_.size()) {
     auto [wp_idx, dist] = find_nearest_waypoint_in_lane(current_lane_idx_, rx, ry);
     
     // If we've reached near the end of the lane, mark it as cleaned
-    if (wp_idx != -1 && static_cast<size_t>(wp_idx) > lanes_[current_lane_idx_].size() * 0.9) {
+    if (wp_idx != -1 && static_cast<size_t>(wp_idx) > lanes_[current_lane_idx_].size() * 0.8) {
        if (dist < threshold) {
-         lane_statuses_[current_lane_idx_] = LaneStatus::CLEANED;
-         RCLCPP_INFO(logger_, "PathManager: Lane %zu marked as CLEANED.", current_lane_idx_);
+         if (lane_statuses_[current_lane_idx_] != LaneStatus::CLEANED) {
+           lane_statuses_[current_lane_idx_] = LaneStatus::CLEANED;
+           RCLCPP_INFO(logger_, "PathManager: Lane %zu marked as CLEANED.", current_lane_idx_);
+         }
        }
     }
   }

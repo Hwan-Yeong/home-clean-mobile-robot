@@ -15,9 +15,12 @@ RobotFacade::RobotFacade(rclcpp::Node* node)
   
   follow_path_client_ = rclcpp_action::create_client<FollowPath>(
     node_, "/follow_path", action_cb_group_);
+  navigate_to_pose_client_ = rclcpp_action::create_client<NavigateToPose>(
+    node_, "/navigate_to_pose", action_cb_group_);
 
   marker_pub_ = node_->create_publisher<visualization_msgs::msg::Marker>("/coverage_path_markers", 10);
   vel_pub_ = node_->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
+  initial_pose_pub_ = node_->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("/initialpose", 10);
 
   tf_buffer_ = std::make_unique<tf2_ros::Buffer>(node_->get_clock());
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
@@ -83,6 +86,26 @@ void RobotFacade::follow_path(
   follow_path_client_->async_send_goal(goal, options);
 }
 
+void RobotFacade::navigate_to_pose(
+  const geometry_msgs::msg::PoseStamped & pose,
+  std::function<void(bool)> result_callback)
+{
+  if (!navigate_to_pose_client_->wait_for_action_server(std::chrono::seconds(2))) {
+    result_callback(false);
+    return;
+  }
+
+  auto goal = NavigateToPose::Goal();
+  goal.pose = pose;
+
+  auto options = rclcpp_action::Client<NavigateToPose>::SendGoalOptions();
+  options.result_callback = [result_callback](const auto & result) {
+    result_callback(result.code == rclcpp_action::ResultCode::SUCCEEDED);
+  };
+
+  navigate_to_pose_client_->async_send_goal(goal, options);
+}
+
 void RobotFacade::turn_to_heading(double target_yaw, std::function<void(bool)> callback)
 {
   if (rotation_timer_) rotation_timer_->cancel();
@@ -109,6 +132,38 @@ void RobotFacade::turn_to_heading(double target_yaw, std::function<void(bool)> c
       // Wait for next tick
     }
   });
+}
+
+void RobotFacade::set_initial_pose(double x, double y, double yaw)
+{
+  geometry_msgs::msg::PoseWithCovarianceStamped pose;
+  pose.header.frame_id = "map";
+  pose.header.stamp = node_->now();
+  pose.pose.pose.position.x = x;
+  pose.pose.pose.position.y = y;
+  
+  tf2::Quaternion q;
+  q.setRPY(0, 0, yaw);
+  pose.pose.pose.orientation = tf2::toMsg(q);
+  
+  // Standard initial covariance
+  pose.pose.covariance[0] = 0.25;
+  pose.pose.covariance[7] = 0.25;
+  pose.pose.covariance[35] = 0.06;
+
+  initial_pose_pub_->publish(pose);
+  RCLCPP_INFO(node_->get_logger(), "Published initial pose: (%.2f, %.2f, %.2f)", x, y, yaw);
+}
+
+bool RobotFacade::is_localized()
+{
+  try {
+    // Check if map->base_link transform is available
+    tf_buffer_->lookupTransform("map", "base_link", tf2::TimePointZero, std::chrono::milliseconds(100));
+    return true;
+  } catch (...) {
+    return false;
+  }
 }
 
 void RobotFacade::cancel_all_navigation()
