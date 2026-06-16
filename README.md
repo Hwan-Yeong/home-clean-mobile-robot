@@ -26,7 +26,7 @@ TurtleBot3 Waffle 모델을 사용하여 Gazebo 가상 환경에서:
 
 ```bash
 # 1. 시스템 의존성 설치
-cd ~/hyjoe_repositories/src/home-clean-mobile-robot
+cd ~/{workspace}
 chmod +x install_deps.sh
 ./install_deps.sh
 

@@ -70,7 +70,7 @@ repositories:
 
 ```bash
 # 1. 처음 세팅 시: 모든 소스 클론
-cd ~/hyjoe_repositories/src/home-clean-mobile-robot
+cd ~/{workspace}
 vcs import . < deps.repos
 
 # 2. 모든 저장소를 최신으로 업데이트
@@ -97,7 +97,7 @@ vcs import . < deps_snapshot.repos
 ### Step 3-1: 시스템 의존성 설치
 
 ```bash
-cd ~/hyjoe_repositories/src/home-clean-mobile-robot
+cd ~/{workspace}
 chmod +x install_deps.sh
 ./install_deps.sh
 ```
@@ -111,7 +111,7 @@ chmod +x install_deps.sh
 ### Step 3-2: 소스 코드 다운로드
 
 ```bash
-cd ~/hyjoe_repositories/src/home-clean-mobile-robot
+cd ~/{workspace}
 vcs import . < deps.repos
 ```
 
@@ -125,7 +125,7 @@ sudo rosdep init 2>/dev/null || true
 rosdep update
 
 # 워크스페이스 의존성 설치
-cd ~/hyjoe_repositories/src/home-clean-mobile-robot
+cd ~/{workspace}
 rosdep install --from-paths src --ignore-src -r -y
 ```
 
@@ -136,7 +136,7 @@ rosdep install --from-paths src --ignore-src -r -y
 ### 전체 빌드
 
 ```bash
-cd ~/hyjoe_repositories/src/home-clean-mobile-robot
+cd ~/{workspace}
 colcon build --symlink-install
 ```
 
@@ -157,7 +157,7 @@ source install/setup.bash
 
 > **💡 Tip**: 매번 수동으로 소싱하지 않으려면 `.bashrc`에 추가:
 > ```bash
-> echo 'source ~/hyjoe_repositories/src/home-clean-mobile-robot/install/setup.bash' >> ~/.bashrc
+> echo 'source ~/{workspace}/install/setup.bash' >> ~/.bashrc
 > ```
 
 ---

@@ -21,7 +21,7 @@ from launch.substitutions import LaunchConfiguration
 
 def generate_launch_description():
     # Map directory in the source tree to avoid data loss during fresh builds
-    maps_dir = '/home/hyjoe/hyjoe_repositories/src/home-clean-mobile-robot/src/clean_robot_pkg/maps'
+    maps_dir = '/home/hyjoe/hyjoe_repositories/home-clean-mobile-robot/src/clean_robot_pkg/maps'
 
     map_name = LaunchConfiguration('map_name', default='house_map')
 
