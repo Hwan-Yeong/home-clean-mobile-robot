@@ -1,0 +1,46 @@
+@startuml
+package "Clean Robot Package" {
+    class CoverageClientNode <<Orchestrator>> {
+        -MissionManager mission_manager_
+        -RobotFacade robot_
+        +on_clean_start()
+    }
+
+    class RobotFacade <<Facade>> {
+        -rclcpp::Node* node_
+        -tf2_ros::Buffer tf_buffer_
+        -ActionClient coverage_client_
+        -ActionClient follow_path_client_
+        +get_pose()
+        +is_blocked()
+        +compute_path(polygon)
+        +follow_path(path)
+        +cancel_all_goals()
+    }
+
+    interface ICleaningStrategy {
+        +generate_path(polygon) : Path
+        +select_next_lane(rx, ry) : Lane
+        +update_progress(rx, ry)
+    }
+
+    class ZigZagStrategy {
+        -CoveragePathManager path_manager_
+        +generate_path(polygon)
+        +select_next_lane(rx, ry)
+    }
+
+    class MissionManager {
+        -ICleaningStrategy* current_strategy_
+        -RobotFacade* robot_
+        +execute_mission()
+        +handle_obstacle()
+    }
+
+    CoverageClientNode --> MissionManager
+    CoverageClientNode --> RobotFacade
+    MissionManager --> ICleaningStrategy
+    MissionManager --> RobotFacade
+    ICleaningStrategy <|-- ZigZagStrategy
+}
+@enduml

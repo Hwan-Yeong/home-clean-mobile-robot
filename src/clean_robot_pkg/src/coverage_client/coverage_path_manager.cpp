@@ -14,6 +14,7 @@ void CoveragePathManager::set_path(const nav_msgs::msg::Path & path)
 {
   raw_path_ = path;
   lanes_ = split_into_lanes(path);
+  lane_statuses_.assign(lanes_.size(), LaneStatus::PENDING);
   current_lane_idx_ = 0;
 }
 
@@ -25,11 +26,60 @@ const CoveragePathManager::Lane * CoveragePathManager::get_current_lane() const
   return nullptr;
 }
 
-void CoveragePathManager::increment_lane()
+void CoveragePathManager::mark_lane_status(size_t index, LaneStatus status)
+{
+  if (index < lane_statuses_.size()) {
+    lane_statuses_[index] = status;
+  }
+}
+
+void CoveragePathManager::update_progress(double rx, double ry, double threshold)
 {
   if (current_lane_idx_ < lanes_.size()) {
-    current_lane_idx_++;
+    auto [wp_idx, dist] = find_nearest_waypoint_in_lane(current_lane_idx_, rx, ry);
+    
+    // If we've reached near the end of the lane, mark it as cleaned
+    if (wp_idx != -1 && static_cast<size_t>(wp_idx) > lanes_[current_lane_idx_].size() * 0.9) {
+       if (dist < threshold) {
+         lane_statuses_[current_lane_idx_] = LaneStatus::CLEANED;
+         RCLCPP_INFO(logger_, "PathManager: Lane %zu marked as CLEANED.", current_lane_idx_);
+       }
+    }
   }
+}
+
+std::pair<int, int> CoveragePathManager::select_next_best_lane(double rx, double ry)
+{
+  int best_lane = -1;
+  int best_wp = -1;
+  double min_cost = std::numeric_limits<double>::max();
+
+  // Prefer PENDING lanes, then BLOCKED ones if no PENDING remains
+  for (int phase = 0; phase < 2; ++phase) {
+    LaneStatus target_status = (phase == 0) ? LaneStatus::PENDING : LaneStatus::BLOCKED;
+    
+    for (size_t i = 0; i < lanes_.size(); ++i) {
+      if (lane_statuses_[i] == target_status) {
+        auto [wp_idx, dist] = find_nearest_waypoint_in_lane(i, rx, ry);
+        if (wp_idx != -1) {
+          // Simple cost: distance (could add rotation cost later)
+          if (dist < min_cost) {
+            min_cost = dist;
+            best_lane = static_cast<int>(i);
+            best_wp = wp_idx;
+          }
+        }
+      }
+    }
+    if (best_lane != -1) break;
+  }
+
+  if (best_lane != -1) {
+    current_lane_idx_ = static_cast<size_t>(best_lane);
+    lane_statuses_[current_lane_idx_] = LaneStatus::IN_PROGRESS;
+  }
+
+  return {best_lane, best_wp};
 }
 
 std::pair<int, double> CoveragePathManager::find_nearest_waypoint_in_lane(size_t lane_idx, double rx, double ry) const

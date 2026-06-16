@@ -39,6 +39,8 @@ add_executable(coverage_client
   src/coverage_client/main.cpp
   src/coverage_client/coverage_client_node.cpp
   src/coverage_client/coverage_path_manager.cpp
+  src/coverage_client/robot_facade.cpp
+  src/coverage_client/strategies/zigzag_strategy.cpp
 )
 ament_target_dependencies(coverage_client
   rclcpp
